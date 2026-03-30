@@ -8,14 +8,23 @@ output "cluster_arn" {
   value       = aws_ecs_cluster.main.arn
 }
 
+# --- Map outputs (canonical) ---
+
+output "service_names" {
+  description = "Map of service name → ECS service name"
+  value       = { for k, svc in aws_ecs_service.service : k => svc.name }
+}
+
+# --- Legacy individual outputs (backward compat) ---
+
 output "web_service_name" {
-  description = "ECS web service name"
-  value       = aws_ecs_service.web.name
+  description = "ECS web service name (legacy — prefer service_names[\"web\"])"
+  value       = lookup({ for k, svc in aws_ecs_service.service : k => svc.name }, "web", "")
 }
 
 output "backend_service_name" {
-  description = "ECS backend service name"
-  value       = aws_ecs_service.backend.name
+  description = "ECS backend service name (legacy — prefer service_names[\"backend\"])"
+  value       = lookup({ for k, svc in aws_ecs_service.service : k => svc.name }, "backend", "")
 }
 
 output "execution_role_arn" {

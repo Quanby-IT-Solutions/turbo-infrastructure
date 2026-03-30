@@ -38,6 +38,7 @@ module "ecr" {
   environment           = "staging"
   image_retention_count = 15
   force_delete          = true
+  services              = var.services
 }
 
 # --- Monitoring (log groups only, no alarms) ------------------------------
@@ -49,4 +50,5 @@ module "monitoring" {
   environment        = "staging"
   log_retention_days = 14
   enable_alarms      = false
+  service_names      = toset(keys(var.services))
 }

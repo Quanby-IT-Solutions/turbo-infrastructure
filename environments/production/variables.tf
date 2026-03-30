@@ -36,13 +36,34 @@ variable "az_count" {
   }
 }
 
-variable "api_domain" {
-  description = "API subdomain for host-based routing (e.g., api.yourdomain.com)"
-  type        = string
+variable "services" {
+  description = <<-EOT
+    Map of services to deploy. Each key becomes the service name used in all resource names.
+    Adding a new service here is the only change needed to provision its full AWS stack:
+    ECR repo, ECS task/service, ALB target group, security group, and CloudWatch log group.
+  EOT
+
+  type = map(object({
+    port                 = number
+    health_check_path    = string
+    cpu                  = string
+    memory               = string
+    desired_count        = optional(number, 1)
+    expose_via_alb       = optional(bool, true)
+    is_alb_default       = optional(bool, false)
+    domain               = optional(string, "")
+    health_check_matcher = optional(string, "200-399")
+    allow_vpc_egress     = optional(bool, false)
+  }))
 
   validation {
-    condition     = can(regex("^[a-z0-9][a-z0-9.-]+\\.[a-z]{2,}$", var.api_domain))
-    error_message = "api_domain must be a valid domain name (e.g., api.yourdomain.com)."
+    condition     = length(values(var.services)) == length(distinct([for s in values(var.services) : s.port]))
+    error_message = "All services must have unique ports."
+  }
+
+  validation {
+    condition     = length([for k, s in var.services : k if s.is_alb_default]) <= 1
+    error_message = "At most one service can have is_alb_default = true."
   }
 }
 

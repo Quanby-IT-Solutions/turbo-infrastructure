@@ -250,20 +250,15 @@ resource "aws_security_group" "alb" {
     description = "HTTPS from internet"
   }
 
-  egress {
-    from_port   = 3001
-    to_port     = 3001
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Web containers in private subnets"
-  }
-
-  egress {
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Backend containers in private subnets"
+  dynamic "egress" {
+    for_each = { for k, v in var.services : k => v if v.expose_via_alb }
+    content {
+      from_port   = egress.value.port
+      to_port     = egress.value.port
+      protocol    = "tcp"
+      cidr_blocks = [var.vpc_cidr]
+      description = "${egress.key} containers in private subnets"
+    }
   }
 
   tags = {
@@ -276,17 +271,22 @@ resource "aws_security_group" "alb" {
   }
 }
 
-resource "aws_security_group" "ecs_web" {
-  name_prefix = "${var.project_name}-ecs-web-${var.environment}-"
-  description = "Allow traffic from ALB to web containers"
+resource "aws_security_group" "ecs_service" {
+  for_each = var.services
+
+  name_prefix = "${var.project_name}-ecs-${each.key}-${var.environment}-"
+  description = "Allow traffic to ${each.key} containers"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    from_port       = 3001
-    to_port         = 3001
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-    description     = "Web traffic from ALB"
+  dynamic "ingress" {
+    for_each = each.value.expose_via_alb ? [1] : []
+    content {
+      from_port       = each.value.port
+      to_port         = each.value.port
+      protocol        = "tcp"
+      security_groups = [aws_security_group.alb.id]
+      description     = "${each.key} traffic from ALB"
+    }
   }
 
   egress {
@@ -313,72 +313,21 @@ resource "aws_security_group" "ecs_web" {
     description = "DNS resolution"
   }
 
-  tags = {
-    Name        = "${var.project_name}-ecs-web-sg-${var.environment}"
-    Environment = var.environment
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_security_group" "ecs_backend" {
-  name_prefix = "${var.project_name}-ecs-backend-${var.environment}-"
-  description = "Allow traffic from ALB to backend containers"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-    description     = "Backend traffic from ALB"
-  }
-
-  egress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS outbound (AWS APIs, ECR, external services)"
-  }
-
-  egress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "PostgreSQL within VPC"
-  }
-
-  egress {
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Redis within VPC"
-  }
-
-  egress {
-    from_port   = 53
-    to_port     = 53
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "DNS resolution"
-  }
-
-  egress {
-    from_port   = 53
-    to_port     = 53
-    protocol    = "udp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "DNS resolution"
+  dynamic "egress" {
+    for_each = each.value.allow_vpc_egress ? [1] : []
+    content {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [var.vpc_cidr]
+      description = "All traffic within VPC (DB, Redis, internal services)"
+    }
   }
 
   tags = {
-    Name        = "${var.project_name}-ecs-backend-sg-${var.environment}"
+    Name        = "${var.project_name}-ecs-${each.key}-sg-${var.environment}"
     Environment = var.environment
+    Service     = each.key
   }
 
   lifecycle {

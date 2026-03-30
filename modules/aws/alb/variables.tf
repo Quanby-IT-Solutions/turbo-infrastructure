@@ -23,9 +23,20 @@ variable "alb_security_group_id" {
   type        = string
 }
 
-variable "api_domain" {
-  description = "API subdomain for host-based routing (e.g., api.yourdomain.com)"
-  type        = string
+variable "services" {
+  description = <<-EOT
+    Map of services. Services with expose_via_alb = true get a target group.
+    Services with domain set get a host-header listener routing rule.
+    The service with is_alb_default = true (or the first alphabetical) receives unmatched traffic.
+  EOT
+  type = map(object({
+    port                 = number
+    health_check_path    = string
+    expose_via_alb       = optional(bool, true)
+    is_alb_default       = optional(bool, false)
+    domain               = optional(string, "")
+    health_check_matcher = optional(string, "200-399")
+  }))
 }
 
 variable "certificate_arn" {

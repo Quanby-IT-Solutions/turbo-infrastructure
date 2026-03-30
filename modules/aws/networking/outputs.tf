@@ -28,12 +28,21 @@ output "alb_security_group_id" {
   value       = aws_security_group.alb.id
 }
 
+# --- Map outputs (canonical) ---
+
+output "ecs_service_security_group_ids" {
+  description = "Map of service name \u2192 ECS security group ID"
+  value       = { for k, sg in aws_security_group.ecs_service : k => sg.id }
+}
+
+# --- Legacy individual outputs (backward compat) ---
+
 output "ecs_web_security_group_id" {
-  description = "Security group ID for ECS web tasks"
-  value       = aws_security_group.ecs_web.id
+  description = "Security group ID for ECS web tasks (legacy \u2014 prefer ecs_service_security_group_ids[\"web\"])"
+  value       = lookup({ for k, sg in aws_security_group.ecs_service : k => sg.id }, "web", "")
 }
 
 output "ecs_backend_security_group_id" {
-  description = "Security group ID for ECS backend tasks"
-  value       = aws_security_group.ecs_backend.id
+  description = "Security group ID for ECS backend tasks (legacy \u2014 prefer ecs_service_security_group_ids[\"backend\"])"
+  value       = lookup({ for k, sg in aws_security_group.ecs_service : k => sg.id }, "backend", "")
 }

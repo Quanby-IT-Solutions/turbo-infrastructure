@@ -69,27 +69,29 @@ resource "aws_iam_role" "ecs_task" {
 # Minimal nginx tasks so services can be created. The app deploy workflow
 # registers real task definitions and updates the services.
 
-resource "aws_ecs_task_definition" "web_placeholder" {
-  family                   = "${var.project_name}-web-${var.environment}"
+resource "aws_ecs_task_definition" "service" {
+  for_each = var.services
+
+  family                   = "${var.project_name}-${each.key}-${var.environment}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = var.web_cpu
-  memory                   = var.web_memory
+  cpu                      = each.value.cpu
+  memory                   = each.value.memory
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "web"
+    name      = each.key
     image     = "nginx:alpine"
     essential = true
     portMappings = [{
-      containerPort = 3001
+      containerPort = each.value.port
       protocol      = "tcp"
     }]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        "awslogs-group"         = "/ecs/${var.project_name}-web-${var.environment}"
+        "awslogs-group"         = "/ecs/${var.project_name}-${each.key}-${var.environment}"
         "awslogs-region"        = data.aws_region.current.name
         "awslogs-stream-prefix" = "ecs"
         "awslogs-create-group"  = "true"
@@ -98,43 +100,9 @@ resource "aws_ecs_task_definition" "web_placeholder" {
   }])
 
   tags = {
-    Name        = "${var.project_name}-web-${var.environment}"
+    Name        = "${var.project_name}-${each.key}-${var.environment}"
     Environment = var.environment
-    Placeholder = "true"
-  }
-}
-
-resource "aws_ecs_task_definition" "backend_placeholder" {
-  family                   = "${var.project_name}-backend-${var.environment}"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = var.backend_cpu
-  memory                   = var.backend_memory
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
-
-  container_definitions = jsonencode([{
-    name      = "backend"
-    image     = "nginx:alpine"
-    essential = true
-    portMappings = [{
-      containerPort = 3000
-      protocol      = "tcp"
-    }]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = "/ecs/${var.project_name}-backend-${var.environment}"
-        "awslogs-region"        = data.aws_region.current.name
-        "awslogs-stream-prefix" = "ecs"
-        "awslogs-create-group"  = "true"
-      }
-    }
-  }])
-
-  tags = {
-    Name        = "${var.project_name}-backend-${var.environment}"
-    Environment = var.environment
+    Service     = each.key
     Placeholder = "true"
   }
 }
@@ -143,23 +111,28 @@ resource "aws_ecs_task_definition" "backend_placeholder" {
 # ignore_changes on task_definition so the app deploy workflow can update
 # the task definition without Terraform reverting it.
 
-resource "aws_ecs_service" "web" {
-  name            = "${var.project_name}-web-${var.environment}-service"
+resource "aws_ecs_service" "service" {
+  for_each = var.services
+
+  name            = "${var.project_name}-${each.key}-${var.environment}-service"
   cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.web_placeholder.arn
-  desired_count   = var.web_desired_count
+  task_definition = aws_ecs_task_definition.service[each.key].arn
+  desired_count   = each.value.desired_count
   launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [var.ecs_web_security_group_id]
+    security_groups  = [var.service_security_group_ids[each.key]]
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = var.web_target_group_arn
-    container_name   = "web"
-    container_port   = 3001
+  dynamic "load_balancer" {
+    for_each = (each.value.expose_via_alb && contains(keys(var.target_group_arns), each.key)) ? [1] : []
+    content {
+      target_group_arn = var.target_group_arns[each.key]
+      container_name   = each.key
+      container_port   = each.value.port
+    }
   }
 
   lifecycle {
@@ -167,92 +140,33 @@ resource "aws_ecs_service" "web" {
   }
 
   tags = {
-    Name        = "${var.project_name}-web-${var.environment}-service"
+    Name        = "${var.project_name}-${each.key}-${var.environment}-service"
     Environment = var.environment
-    Service     = "web"
-  }
-}
-
-resource "aws_ecs_service" "backend" {
-  name            = "${var.project_name}-backend-${var.environment}-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend_placeholder.arn
-  desired_count   = var.backend_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = var.private_subnet_ids
-    security_groups  = [var.ecs_backend_security_group_id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = var.backend_target_group_arn
-    container_name   = "backend"
-    container_port   = 3000
-  }
-
-  lifecycle {
-    ignore_changes = [task_definition, desired_count]
-  }
-
-  tags = {
-    Name        = "${var.project_name}-backend-${var.environment}-service"
-    Environment = var.environment
-    Service     = "backend"
+    Service     = each.key
   }
 }
 
 # --- Auto Scaling ---------------------------------------------------------
 # When enabled, scales ECS services based on CPU utilization.
 
-resource "aws_appautoscaling_target" "web" {
-  count = var.enable_autoscaling ? 1 : 0
+resource "aws_appautoscaling_target" "service" {
+  for_each = var.enable_autoscaling ? var.services : {}
 
   max_capacity       = var.autoscaling_max_capacity
   min_capacity       = var.autoscaling_min_capacity
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.web.name}"
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.service[each.key].name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
 }
 
-resource "aws_appautoscaling_policy" "web_cpu" {
-  count = var.enable_autoscaling ? 1 : 0
+resource "aws_appautoscaling_policy" "service_cpu" {
+  for_each = var.enable_autoscaling ? var.services : {}
 
-  name               = "${var.project_name}-web-cpu-scaling-${var.environment}"
+  name               = "${var.project_name}-${each.key}-cpu-scaling-${var.environment}"
   policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.web[0].resource_id
-  scalable_dimension = aws_appautoscaling_target.web[0].scalable_dimension
-  service_namespace  = aws_appautoscaling_target.web[0].service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
-    }
-    target_value       = var.autoscaling_cpu_target
-    scale_in_cooldown  = 300
-    scale_out_cooldown = 60
-  }
-}
-
-resource "aws_appautoscaling_target" "backend" {
-  count = var.enable_autoscaling ? 1 : 0
-
-  max_capacity       = var.autoscaling_max_capacity
-  min_capacity       = var.autoscaling_min_capacity
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.backend.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace  = "ecs"
-}
-
-resource "aws_appautoscaling_policy" "backend_cpu" {
-  count = var.enable_autoscaling ? 1 : 0
-
-  name               = "${var.project_name}-backend-cpu-scaling-${var.environment}"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.backend[0].resource_id
-  scalable_dimension = aws_appautoscaling_target.backend[0].scalable_dimension
-  service_namespace  = aws_appautoscaling_target.backend[0].service_namespace
+  resource_id        = aws_appautoscaling_target.service[each.key].resource_id
+  scalable_dimension = aws_appautoscaling_target.service[each.key].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.service[each.key].service_namespace
 
   target_tracking_scaling_policy_configuration {
     predefined_metric_specification {

@@ -1,3 +1,24 @@
 # Copy this to terraform.tfvars and fill in your values
 project_name = "turbo-template"
 aws_region   = "ap-southeast-1"
+
+# Services — staging provisions ECR repos and CloudWatch log groups only.
+# ECS, ALB, and networking are managed by the app repo's EC2/Docker Compose deploy workflow.
+services = {
+  web = {
+    port              = 3001
+    health_check_path = "/"
+    cpu               = "256"
+    memory            = "512"
+    domain            = "app.yourdomain.com"
+  }
+  backend = {
+    port                 = 3000
+    health_check_path    = "/api/v1/health"
+    cpu                  = "256"
+    memory               = "512"
+    domain               = "api.yourdomain.com"
+    health_check_matcher = "200"
+    allow_vpc_egress     = true
+  }
+}

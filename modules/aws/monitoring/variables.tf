@@ -37,16 +37,22 @@ variable "ecs_cluster_name" {
   default     = ""
 }
 
-variable "ecs_web_service_name" {
-  description = "ECS web service name for alarm dimensions"
-  type        = string
-  default     = ""
+variable "service_names" {
+  description = "Set of service names to create CloudWatch log groups for (one per service)."
+  type        = set(string)
+  default     = []
 }
 
-variable "ecs_backend_service_name" {
-  description = "ECS backend service name for alarm dimensions"
-  type        = string
-  default     = ""
+variable "ecs_service_names" {
+  description = "Map of service name \u2192 ECS service name. Used for CPU/memory alarm dimensions."
+  type        = map(string)
+  default     = {}
+}
+
+variable "target_group_arn_suffixes" {
+  description = "Map of service name \u2192 ALB target group ARN suffix. Used for unhealthy-target alarms."
+  type        = map(string)
+  default     = {}
 }
 
 variable "cpu_alarm_threshold" {
@@ -78,19 +84,7 @@ variable "alarm_sns_topic_arn" {
 }
 
 variable "alb_arn_suffix" {
-  description = "ALB ARN suffix for target health and 5xx alarms (empty = ALB alarms disabled)"
-  type        = string
-  default     = ""
-}
-
-variable "web_target_group_arn_suffix" {
-  description = "Web target group ARN suffix for health alarms"
-  type        = string
-  default     = ""
-}
-
-variable "backend_target_group_arn_suffix" {
-  description = "Backend target group ARN suffix for health alarms"
+  description = "ALB ARN suffix for 5xx and target health alarms (empty = ALB alarms disabled)"
   type        = string
   default     = ""
 }

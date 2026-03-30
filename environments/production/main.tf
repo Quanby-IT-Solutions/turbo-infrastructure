@@ -37,6 +37,7 @@ module "networking" {
   enable_nat_ha           = var.enable_nat_ha
   enable_flow_logs        = true
   flow_log_retention_days = 90
+  services                = var.services
 }
 
 # --- ECR -----------------------------------------------------------------
@@ -49,6 +50,7 @@ module "ecr" {
   image_retention_count = 30
   image_tag_mutability  = "IMMUTABLE"
   encryption_type       = "KMS"
+  services              = var.services
 }
 
 # --- ALB -----------------------------------------------------------------
@@ -61,7 +63,7 @@ module "alb" {
   vpc_id                     = module.networking.vpc_id
   public_subnet_ids          = module.networking.public_subnet_ids
   alb_security_group_id      = module.networking.alb_security_group_id
-  api_domain                 = var.api_domain
+  services                   = var.services
   certificate_arn            = var.certificate_arn
   enable_deletion_protection = true
 }
@@ -71,18 +73,12 @@ module "alb" {
 module "ecs" {
   source = "../../modules/aws/ecs"
 
-  project_name                  = var.project_name
-  environment                   = "production"
-  private_subnet_ids            = module.networking.private_subnet_ids
-  ecs_web_security_group_id     = module.networking.ecs_web_security_group_id
-  ecs_backend_security_group_id = module.networking.ecs_backend_security_group_id
-  web_target_group_arn          = module.alb.web_target_group_arn
-  backend_target_group_arn      = module.alb.backend_target_group_arn
-
-  web_cpu        = "512"
-  web_memory     = "1024"
-  backend_cpu    = "512"
-  backend_memory = "1024"
+  project_name               = var.project_name
+  environment                = "production"
+  private_subnet_ids         = module.networking.private_subnet_ids
+  service_security_group_ids = module.networking.ecs_service_security_group_ids
+  services                   = var.services
+  target_group_arns          = module.alb.target_group_arns
 }
 
 # --- Monitoring ----------------------------------------------------------
@@ -90,17 +86,17 @@ module "ecs" {
 module "monitoring" {
   source = "../../modules/aws/monitoring"
 
-  project_name             = var.project_name
-  environment              = "production"
-  log_retention_days       = 90
-  enable_alarms            = var.enable_alarms
-  alarm_sns_topic_arn      = var.alarm_sns_topic_arn
-  ecs_cluster_name         = module.ecs.cluster_name
-  ecs_web_service_name     = module.ecs.web_service_name
-  ecs_backend_service_name = module.ecs.backend_service_name
+  project_name        = var.project_name
+  environment         = "production"
+  log_retention_days  = 90
+  enable_alarms       = var.enable_alarms
+  alarm_sns_topic_arn = var.alarm_sns_topic_arn
+  ecs_cluster_name    = module.ecs.cluster_name
+
+  service_names             = toset(keys(var.services))
+  ecs_service_names         = module.ecs.service_names
+  target_group_arn_suffixes = module.alb.target_group_arn_suffixes
 
   # ALB alarms
-  alb_arn_suffix                  = module.alb.alb_arn_suffix
-  web_target_group_arn_suffix     = module.alb.web_target_group_arn_suffix
-  backend_target_group_arn_suffix = module.alb.backend_target_group_arn_suffix
+  alb_arn_suffix = module.alb.alb_arn_suffix
 }

@@ -1,9 +1,42 @@
 # Copy this to terraform.tfvars and fill in your values
-project_name  = "turbo-template"
-aws_region    = "ap-southeast-1"
-vpc_cidr      = "10.0.0.0/16"
-az_count      = 2
-api_domain    = "api.yourdomain.com"
+project_name = "turbo-template"
+aws_region   = "ap-southeast-1"
+vpc_cidr     = "10.0.0.0/16"
+az_count     = 2
+
+# Services — each key becomes the service name used in all AWS resource names.
+# Add a new entry here to provision the full stack for a new service:
+#   ECR repo, ECS task/service, ALB target group, security group, CloudWatch log group.
+services = {
+  web = {
+    port              = 3001
+    health_check_path = "/"
+    cpu               = "512"
+    memory            = "1024"
+    domain            = "app.yourdomain.com" # host-header routing rule on ALB
+    is_alb_default    = true                 # web receives all unmatched ALB traffic
+    desired_count     = 1
+  }
+  backend = {
+    port                 = 3000
+    health_check_path    = "/api/v1/health"
+    cpu                  = "512"
+    memory               = "1024"
+    domain               = "api.yourdomain.com" # host-header routing rule on ALB
+    health_check_matcher = "200"
+    allow_vpc_egress     = true # enables DB (5432) + Redis (6379) egress within VPC
+    desired_count        = 1
+  }
+  # worker = {                          # Example: add a third service
+  #   port                 = 3002
+  #   health_check_path    = "/health"
+  #   cpu                  = "256"
+  #   memory               = "512"
+  #   expose_via_alb       = false       # internal only — no ALB target group
+  #   allow_vpc_egress     = true
+  # }
+}
+
 enable_alarms = false
 
 # HTTPS — set your ACM certificate ARN to enable HTTPS with HTTP→HTTPS redirect

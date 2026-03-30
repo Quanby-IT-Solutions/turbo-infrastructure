@@ -47,3 +47,13 @@ variable "flow_log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "services" {
+  description = "Map of services. Used to derive per-service ECS security groups and ALB egress rules."
+  type = map(object({
+    port             = number
+    expose_via_alb   = optional(bool, true)
+    allow_vpc_egress = optional(bool, false)
+  }))
+  default = {}
+}

@@ -8,6 +8,11 @@ variable "environment" {
   type        = string
 }
 
+variable "services" {
+  description = "Map of services. Each key becomes an ECR repository: <project>-<service>-<environment>."
+  type        = map(any)
+}
+
 variable "image_retention_count" {
   description = "Number of images to keep per repository"
   type        = number
