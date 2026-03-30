@@ -1,0 +1,12 @@
+# =============================================================================
+# Bootstrap Configuration (Example)
+# =============================================================================
+# These values are used to create the S3 bucket and DynamoDB table
+# for Terraform remote state storage and locking.
+# Copy this file to terraform.tfvars and edit as needed
+# =============================================================================
+
+project_name = "turbo-template"
+aws_region   = "ap-southeast-1"
+client_name  = "Quanby"
+auto_backup  = false

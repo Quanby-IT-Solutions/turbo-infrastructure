@@ -1,13 +1,10 @@
 # =============================================================================
-# Bootstrap: S3 bucket + DynamoDB table for Terraform remote state
+# Bootstrap — S3 + DynamoDB for Terraform Remote State
 # =============================================================================
-# Run this ONCE before using any environment (staging/production):
-#   cd environments/turbo-template/bootstrap
-#   terraform init
-#   terraform apply
+# Run once before staging/production. Uses local state by design.
 #
-# This uses LOCAL state intentionally (chicken-and-egg: can't store state
-# remotely before the remote backend exists).
+#   cp terraform.tfvars.example terraform.tfvars
+#   terraform init && terraform apply
 # =============================================================================
 
 terraform {

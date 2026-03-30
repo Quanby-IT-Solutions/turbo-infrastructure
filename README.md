@@ -148,8 +148,9 @@ This creates the S3 bucket and DynamoDB table used to store Terraform state. Use
 
 ```bash
 cd environments/turbo-template/bootstrap
+cp terraform.tfvars.example terraform.tfvars   # edit as needed
 terraform init
-terraform apply -var="project_name=turbo-template"
+terraform apply
 ```
 
 You only need to do this once per project. If the S3 bucket already exists, skip this step.
@@ -479,8 +480,9 @@ Repeat for `production/`.
 ```bash
 # Bootstrap remote state
 cd environments/<your-project-name>/bootstrap
+cp terraform.tfvars.example terraform.tfvars   # set your project_name
 terraform init
-terraform apply -var="project_name=<your-project-name>"
+terraform apply
 
 # Deploy staging
 cd ../staging
