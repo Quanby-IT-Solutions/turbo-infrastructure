@@ -13,7 +13,7 @@ services = {
     health_check_path = "/"
     cpu               = "512"
     memory            = "1024"
-    domain            = "app.yourdomain.com" # host-header routing rule on ALB
+    domain            = "turbo.quanbyit.com" # host-header routing rule on ALB
     is_alb_default    = true                 # web receives all unmatched ALB traffic
     desired_count     = 1
   }
@@ -22,7 +22,7 @@ services = {
     health_check_path    = "/api/v1/health"
     cpu                  = "512"
     memory               = "1024"
-    domain               = "api.yourdomain.com" # host-header routing rule on ALB
+    domain               = "turbo-be.quanbyit.com" # host-header routing rule on ALB
     health_check_matcher = "200"
     allow_vpc_egress     = true # enables DB (5432) + Redis (6379) egress within VPC
     desired_count        = 1

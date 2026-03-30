@@ -34,7 +34,7 @@ services = {
     health_check_path = "/"
     cpu               = "512"
     memory            = "1024"
-    domain            = "app.yourdomain.com"
+    domain            = "turbo.quanbyit.com"
     is_alb_default    = true   # catches all unmatched ALB traffic
     desired_count     = 1
   }
@@ -43,7 +43,7 @@ services = {
     health_check_path    = "/api/v1/health"
     cpu                  = "512"
     memory               = "1024"
-    domain               = "api.yourdomain.com"
+    domain               = "turbo-be.quanbyit.com"
     health_check_matcher = "200"
     allow_vpc_egress     = true  # enables DB + Redis egress within VPC
     desired_count        = 1

@@ -10,14 +10,14 @@ services = {
     health_check_path = "/"
     cpu               = "256"
     memory            = "512"
-    domain            = "app.yourdomain.com"
+    domain            = "turbo.quanbyit.com"
   }
   backend = {
     port                 = 3000
     health_check_path    = "/api/v1/health"
     cpu                  = "256"
     memory               = "512"
-    domain               = "api.yourdomain.com"
+    domain               = "turbo-be.quanbyit.com"
     health_check_matcher = "200"
     allow_vpc_egress     = true
   }
