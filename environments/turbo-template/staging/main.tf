@@ -32,7 +32,7 @@ provider "aws" {
 # --- ECR -----------------------------------------------------------------
 
 module "ecr" {
-  source = "../../modules/aws/ecr"
+  source = "../../../modules/aws/ecr"
 
   project_name          = var.project_name
   environment           = "staging"
@@ -44,7 +44,7 @@ module "ecr" {
 # --- Monitoring (log groups only, no alarms) ------------------------------
 
 module "monitoring" {
-  source = "../../modules/aws/monitoring"
+  source = "../../../modules/aws/monitoring"
 
   project_name       = var.project_name
   environment        = "staging"

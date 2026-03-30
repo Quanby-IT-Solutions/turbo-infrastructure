@@ -28,7 +28,7 @@ provider "aws" {
 # --- Networking -----------------------------------------------------------
 
 module "networking" {
-  source = "../../modules/aws/networking"
+  source = "../../../modules/aws/networking"
 
   project_name            = var.project_name
   environment             = "production"
@@ -43,7 +43,7 @@ module "networking" {
 # --- ECR -----------------------------------------------------------------
 
 module "ecr" {
-  source = "../../modules/aws/ecr"
+  source = "../../../modules/aws/ecr"
 
   project_name          = var.project_name
   environment           = "production"
@@ -56,7 +56,7 @@ module "ecr" {
 # --- ALB -----------------------------------------------------------------
 
 module "alb" {
-  source = "../../modules/aws/alb"
+  source = "../../../modules/aws/alb"
 
   project_name               = var.project_name
   environment                = "production"
@@ -71,7 +71,7 @@ module "alb" {
 # --- ECS -----------------------------------------------------------------
 
 module "ecs" {
-  source = "../../modules/aws/ecs"
+  source = "../../../modules/aws/ecs"
 
   project_name               = var.project_name
   environment                = "production"
@@ -84,7 +84,7 @@ module "ecs" {
 # --- Monitoring ----------------------------------------------------------
 
 module "monitoring" {
-  source = "../../modules/aws/monitoring"
+  source = "../../../modules/aws/monitoring"
 
   project_name        = var.project_name
   environment         = "production"
