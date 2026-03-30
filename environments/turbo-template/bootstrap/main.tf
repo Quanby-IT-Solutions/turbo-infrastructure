@@ -37,17 +37,36 @@ variable "project_name" {
   default     = "turbo-template"
 }
 
+variable "client_name" {
+  description = "Client or organization name for tagging"
+  type        = string
+  default     = "Quanby"
+}
+
+variable "auto_backup" {
+  description = "Enable automatic backups via tagging"
+  type        = bool
+  default     = false
+}
+
 # -----------------------------------------------------------------------------
 # Provider
 # -----------------------------------------------------------------------------
+
+locals {
+  environment = "bootstrap"
+}
 
 provider "aws" {
   region = var.aws_region
 
   default_tags {
     tags = {
+      environment  = local.environment
       project-name = var.project_name
-      managed-by   = "terraform-bootstrap"
+      client-name  = var.client_name
+      managed-by   = "terraform"
+      auto-backup  = tostring(var.auto_backup)
     }
   }
 }
