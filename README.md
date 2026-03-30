@@ -188,29 +188,6 @@ terraform destroy
 
 ---
 
-## CI/CD
-
-| Workflow    | Trigger                  | Action                                           |
-| ----------- | ------------------------ | ------------------------------------------------ |
-| `plan.yml`  | PR touching `*.tf` files | Runs `terraform plan`, comments result on PR     |
-| `apply.yml` | Merge to `main`          | Runs `terraform apply` for affected environments |
-| `apply.yml` | Manual dispatch          | Apply a specific environment on demand           |
-
-### Required GitHub Secrets
-
-| Secret                  | Description         |
-| ----------------------- | ------------------- |
-| `AWS_ACCESS_KEY_ID`     | IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-
-### Required GitHub Variables
-
-| Variable     | Default          | Description |
-| ------------ | ---------------- | ----------- |
-| `AWS_REGION` | `ap-southeast-1` | AWS region  |
-
----
-
 ## Key Design Decisions
 
 1. **Placeholder task definitions**: ECS services are initially created with `nginx:alpine`. The app repo's deploy workflow registers the real image and updates the service. Terraform never touches it again.
