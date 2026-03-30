@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+# Keep Terraform/HCL and workflow files with LF endings
+*.tf text eol=lf
+*.tfvars text eol=lf
+*.hcl text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+.terraform-version text eol=lf

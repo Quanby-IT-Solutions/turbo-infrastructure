@@ -2,9 +2,12 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfstate.lock.info
 *.tfplan
 *.tfvars
+*.tfvars.json
 !*.tfvars.example
+.terragrunt-cache/
 
 # IDE
 .idea/
@@ -25,3 +28,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# CI-generated files
+.env.*.tfvars.json

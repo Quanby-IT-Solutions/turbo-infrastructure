@@ -30,12 +30,12 @@ provider "aws" {
 module "networking" {
   source = "../../modules/aws/networking"
 
-  project_name   = var.project_name
-  environment    = "production"
-  vpc_cidr       = var.vpc_cidr
-  az_count       = var.az_count
-  enable_nat_ha  = var.enable_nat_ha
-  enable_flow_logs       = true
+  project_name            = var.project_name
+  environment             = "production"
+  vpc_cidr                = var.vpc_cidr
+  az_count                = var.az_count
+  enable_nat_ha           = var.enable_nat_ha
+  enable_flow_logs        = true
   flow_log_retention_days = 90
 }
 
@@ -100,7 +100,7 @@ module "monitoring" {
   ecs_backend_service_name = module.ecs.backend_service_name
 
   # ALB alarms
-  alb_arn_suffix                 = module.alb.alb_arn_suffix
-  web_target_group_arn_suffix    = module.alb.web_target_group_arn_suffix
+  alb_arn_suffix                  = module.alb.alb_arn_suffix
+  web_target_group_arn_suffix     = module.alb.web_target_group_arn_suffix
   backend_target_group_arn_suffix = module.alb.backend_target_group_arn_suffix
 }

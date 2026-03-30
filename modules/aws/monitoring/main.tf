@@ -3,7 +3,7 @@
 # =============================================================================
 
 locals {
-  alarm_actions = var.alarm_sns_topic_arn != "" ? [var.alarm_sns_topic_arn] : []
+  alarm_actions     = var.alarm_sns_topic_arn != "" ? [var.alarm_sns_topic_arn] : []
   enable_alb_alarms = var.enable_alarms && var.alb_arn_suffix != ""
 }
 

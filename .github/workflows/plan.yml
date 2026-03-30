@@ -68,7 +68,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~1.12"
+          terraform_version: "1.14.4"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -80,12 +80,23 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false
 
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive -diff
+
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
         id: plan
         run: |
+          # Generate tfvars from GitHub variables/secrets if terraform.tfvars doesn't exist
+          if [ ! -f terraform.tfvars ]; then
+            cat > terraform.tfvars <<EOF
+          project_name = "${{ vars.PROJECT_NAME || 'turbo-template' }}"
+          aws_region   = "${{ vars.AWS_REGION || 'ap-southeast-1' }}"
+          EOF
+          fi
+          
           terraform plan \
             -input=false \
             -no-color \
