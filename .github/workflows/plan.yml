@@ -1,0 +1,126 @@
+# =============================================================================
+# Terraform Plan - runs on every PR that touches Terraform files
+# =============================================================================
+name: "Terraform Plan"
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "environments/**"
+      - "**.tf"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: terraform-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-environments:
+    name: Detect changed environments
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.detect.outputs.environments }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed environments
+        id: detect
+        run: |
+          ENVS="[]"
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "environments/ modules/")
+
+          if echo "$CHANGED" | grep -qE "modules/|environments/staging/"; then
+            ENVS=$(echo "$ENVS" | jq '. + ["staging"]')
+          fi
+          if echo "$CHANGED" | grep -qE "modules/|environments/production/"; then
+            ENVS=$(echo "$ENVS" | jq '. + ["production"]')
+          fi
+
+          # If only module changes, plan both
+          if echo "$CHANGED" | grep -q "modules/" && ! echo "$CHANGED" | grep -q "environments/"; then
+            ENVS='["staging","production"]'
+          fi
+
+          echo "environments=$ENVS" >> "$GITHUB_OUTPUT"
+          echo "Will plan: $ENVS"
+
+  plan:
+    name: Plan (${{ matrix.environment }})
+    needs: detect-environments
+    if: needs.detect-environments.outputs.environments != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJson(needs.detect-environments.outputs.environments) }}
+
+    defaults:
+      run:
+        working-directory: environments/${{ matrix.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.12"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -input=false \
+            -no-color \
+            -var-file=terraform.tfvars \
+            -out=tfplan \
+            2>&1 | tee plan_output.txt
+        continue-on-error: true
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('environments/${{ matrix.environment }}/plan_output.txt', 'utf8');
+            const maxLen = 60000;
+            const truncated = plan.length > maxLen
+              ? plan.substring(0, maxLen) + '\n\n... (truncated)'
+              : plan;
+
+            const body = `### Terraform Plan: \`${{ matrix.environment }}\`
+
+            \`\`\`
+            ${truncated}
+            \`\`\`
+
+            *Triggered by @${{ github.actor }} in ${{ github.sha }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

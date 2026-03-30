@@ -1,0 +1,49 @@
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name (staging, production)"
+  type        = string
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC (e.g., 10.0.0.0/16)"
+  type        = string
+  default     = "10.0.0.0/16"
+
+  validation {
+    condition     = can(cidrhost(var.vpc_cidr, 0))
+    error_message = "vpc_cidr must be a valid CIDR block."
+  }
+}
+
+variable "az_count" {
+  description = "Number of availability zones to use (1-3)"
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.az_count >= 1 && var.az_count <= 3
+    error_message = "az_count must be between 1 and 3."
+  }
+}
+
+variable "enable_nat_ha" {
+  description = "Create one NAT Gateway per AZ for high availability. When false, a single NAT Gateway is used (cost-optimized)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_flow_logs" {
+  description = "Enable VPC Flow Logs to CloudWatch for network auditing"
+  type        = bool
+  default     = true
+}
+
+variable "flow_log_retention_days" {
+  description = "Retention in days for VPC Flow Log group"
+  type        = number
+  default     = 30
+}

@@ -1,0 +1,16 @@
+# Copy this to terraform.tfvars and fill in your values
+project_name  = "turbo-template"
+aws_region    = "ap-southeast-1"
+vpc_cidr      = "10.0.0.0/16"
+az_count      = 2
+api_domain    = "api.yourdomain.com"
+enable_alarms = false
+
+# HTTPS — set your ACM certificate ARN to enable HTTPS with HTTP→HTTPS redirect
+# certificate_arn = "arn:aws:acm:ap-southeast-1:123456789012:certificate/abc-123"
+
+# High availability — one NAT Gateway per AZ (increases cost, recommended for production)
+# enable_nat_ha = true
+
+# Alarm notifications — required if enable_alarms = true
+# alarm_sns_topic_arn = "arn:aws:sns:ap-southeast-1:123456789012:alerts"
