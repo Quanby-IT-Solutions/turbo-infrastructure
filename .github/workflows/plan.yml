@@ -1,14 +1,19 @@
 # =============================================================================
-# Terraform Plan - runs on every PR that touches Terraform files
+# Terraform Plan - manual run only
 # =============================================================================
 name: "Terraform Plan"
 
 on:
-  pull_request:
-    paths:
-      - "modules/**"
-      - "environments/**"
-      - "**.tf"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to plan (staging, production, or both)"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - both
 
 permissions:
   contents: read
@@ -30,19 +35,10 @@ jobs:
       - name: Detect changed environments
         id: detect
         run: |
-          ENVS="[]"
-          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "environments/ modules/")
-
-          if echo "$CHANGED" | grep -qE "modules/|environments/staging/"; then
-            ENVS=$(echo "$ENVS" | jq '. + ["staging"]')
-          fi
-          if echo "$CHANGED" | grep -qE "modules/|environments/production/"; then
-            ENVS=$(echo "$ENVS" | jq '. + ["production"]')
-          fi
-
-          # If only module changes, plan both
-          if echo "$CHANGED" | grep -q "modules/" && ! echo "$CHANGED" | grep -q "environments/"; then
+          if [ "${{ github.event.inputs.environment }}" = "both" ]; then
             ENVS='["staging","production"]'
+          else
+            ENVS='["${{ github.event.inputs.environment }}"]'
           fi
 
           echo "environments=$ENVS" >> "$GITHUB_OUTPUT"
@@ -60,7 +56,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: environments/turbo-template/${{ matrix.environment }}
 
     steps:
       - uses: actions/checkout@v4
@@ -96,7 +92,7 @@ jobs:
           aws_region   = "${{ vars.AWS_REGION || 'ap-southeast-1' }}"
           EOF
           fi
-          
+
           terraform plan \
             -input=false \
             -no-color \
@@ -111,7 +107,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('environments/${{ matrix.environment }}/plan_output.txt', 'utf8');
+            const plan = fs.readFileSync('environments/turbo-template/${{ matrix.environment }}/plan_output.txt', 'utf8');
             const maxLen = 60000;
             const truncated = plan.length > maxLen
               ? plan.substring(0, maxLen) + '\n\n... (truncated)'

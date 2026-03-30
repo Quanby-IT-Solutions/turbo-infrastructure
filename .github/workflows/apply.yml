@@ -1,16 +1,9 @@
 # =============================================================================
-# Terraform Apply - runs on merge to main
+# Terraform Apply - manual run only
 # =============================================================================
 name: "Terraform Apply"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "modules/**"
-      - "environments/**"
-      - "**.tf"
-
   workflow_dispatch:
     inputs:
       environment:
@@ -33,15 +26,12 @@ jobs:
   apply-staging:
     name: Apply (staging)
     if: >
-      github.event_name == 'push' ||
       github.event.inputs.environment == 'staging' ||
       github.event.inputs.environment == 'both'
     runs-on: ubuntu-latest
-    environment: staging
-
     defaults:
       run:
-        working-directory: environments/staging
+        working-directory: environments/turbo-template/staging
 
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +60,7 @@ jobs:
           aws_region   = "${{ vars.AWS_REGION || 'ap-southeast-1' }}"
           EOF
           fi
-          
+
           terraform apply -input=false -auto-approve -var-file=terraform.tfvars
 
       - name: Show outputs
@@ -81,16 +71,13 @@ jobs:
     needs: [apply-staging]
     if: >
       always() && !failure() && !cancelled() && (
-        github.event_name == 'push' ||
         github.event.inputs.environment == 'production' ||
         github.event.inputs.environment == 'both'
       )
     runs-on: ubuntu-latest
-    environment: production
-
     defaults:
       run:
-        working-directory: environments/production
+        working-directory: environments/turbo-template/production
 
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +106,7 @@ jobs:
           aws_region   = "${{ vars.AWS_REGION || 'ap-southeast-1' }}"
           EOF
           fi
-          
+
           terraform apply -input=false -auto-approve -var-file=terraform.tfvars
 
       - name: Show outputs
