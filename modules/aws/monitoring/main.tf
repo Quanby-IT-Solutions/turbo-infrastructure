@@ -17,9 +17,8 @@ resource "aws_cloudwatch_log_group" "service" {
   kms_key_id        = var.kms_key_arn != "" ? var.kms_key_arn : null
 
   tags = {
-    Name        = "${var.project_name}-${each.key}-logs-${var.environment}"
-    Environment = var.environment
-    Service     = each.key
+    Name    = "${var.project_name}-${each.key}-logs-${var.environment}"
+    service = each.key
   }
 }
 
@@ -47,8 +46,7 @@ resource "aws_cloudwatch_metric_alarm" "service_cpu_high" {
   ok_actions    = local.alarm_actions
 
   tags = {
-    Environment = var.environment
-    Severity    = "warning"
+    severity = "warning"
   }
 }
 
@@ -76,8 +74,7 @@ resource "aws_cloudwatch_metric_alarm" "service_memory_high" {
   ok_actions    = local.alarm_actions
 
   tags = {
-    Environment = var.environment
-    Severity    = "warning"
+    severity = "warning"
   }
 }
 
@@ -105,8 +102,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   ok_actions    = local.alarm_actions
 
   tags = {
-    Environment = var.environment
-    Severity    = "critical"
+    severity = "critical"
   }
 }
 
@@ -134,8 +130,7 @@ resource "aws_cloudwatch_metric_alarm" "service_unhealthy_targets" {
   ok_actions    = local.alarm_actions
 
   tags = {
-    Environment = var.environment
-    Severity    = "critical"
+    severity = "critical"
   }
 }
 

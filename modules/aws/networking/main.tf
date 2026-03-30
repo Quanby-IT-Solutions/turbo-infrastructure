@@ -22,8 +22,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
 
   tags = {
-    Name        = "${var.project_name}-vpc-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-vpc-${var.environment}"
   }
 }
 
@@ -36,8 +35,7 @@ resource "aws_cloudwatch_log_group" "flow_logs" {
   retention_in_days = var.flow_log_retention_days
 
   tags = {
-    Name        = "${var.project_name}-flow-logs-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-flow-logs-${var.environment}"
   }
 }
 
@@ -58,8 +56,7 @@ resource "aws_iam_role" "flow_logs" {
   })
 
   tags = {
-    Name        = "${var.project_name}-vpc-flow-logs-role-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-vpc-flow-logs-role-${var.environment}"
   }
 }
 
@@ -94,8 +91,7 @@ resource "aws_flow_log" "main" {
   vpc_id          = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-flow-log-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-flow-log-${var.environment}"
   }
 }
 
@@ -109,9 +105,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name        = "${var.project_name}-public-${count.index}-${var.environment}"
-    Environment = var.environment
-    Tier        = "public"
+    Name = "${var.project_name}-public-${count.index}-${var.environment}"
+    tier = "public"
   }
 }
 
@@ -124,9 +119,8 @@ resource "aws_subnet" "private" {
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name        = "${var.project_name}-private-${count.index}-${var.environment}"
-    Environment = var.environment
-    Tier        = "private"
+    Name = "${var.project_name}-private-${count.index}-${var.environment}"
+    tier = "private"
   }
 }
 
@@ -136,8 +130,7 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.project_name}-igw-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-igw-${var.environment}"
   }
 }
 
@@ -150,8 +143,7 @@ resource "aws_eip" "nat" {
   domain = "vpc"
 
   tags = {
-    Name        = "${var.project_name}-nat-eip-${count.index}-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-nat-eip-${count.index}-${var.environment}"
   }
 }
 
@@ -161,8 +153,7 @@ resource "aws_nat_gateway" "main" {
   subnet_id     = aws_subnet.public[count.index].id
 
   tags = {
-    Name        = "${var.project_name}-nat-${count.index}-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-nat-${count.index}-${var.environment}"
   }
 
   depends_on = [aws_internet_gateway.main]
@@ -179,8 +170,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name        = "${var.project_name}-public-rt-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-public-rt-${var.environment}"
   }
 }
 
@@ -195,8 +185,7 @@ resource "aws_route_table" "private" {
   }
 
   tags = {
-    Name        = "${var.project_name}-private-rt-${count.index}-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-private-rt-${count.index}-${var.environment}"
   }
 }
 
@@ -222,8 +211,7 @@ resource "aws_vpc_endpoint" "s3" {
   route_table_ids = aws_route_table.private[*].id
 
   tags = {
-    Name        = "${var.project_name}-s3-endpoint-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-s3-endpoint-${var.environment}"
   }
 }
 
@@ -262,8 +250,7 @@ resource "aws_security_group" "alb" {
   }
 
   tags = {
-    Name        = "${var.project_name}-alb-sg-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-alb-sg-${var.environment}"
   }
 
   lifecycle {
@@ -325,9 +312,8 @@ resource "aws_security_group" "ecs_service" {
   }
 
   tags = {
-    Name        = "${var.project_name}-ecs-${each.key}-sg-${var.environment}"
-    Environment = var.environment
-    Service     = each.key
+    Name    = "${var.project_name}-ecs-${each.key}-sg-${var.environment}"
+    service = each.key
   }
 
   lifecycle {

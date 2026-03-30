@@ -1,8 +1,18 @@
-# Copy this to terraform.tfvars and fill in your values
-project_name = "turbo-template"
+# =============================================================================
+# Production Environment — terraform.tfvars.example
+# =============================================================================
+# Copy this to terraform.tfvars and fill in your values.
+
+# --- Project / Tagging ----------------------------------------------------
+
+project_name = "turbo-template"          # Used in resource names
+client_name  = "Quanby"                  # Tag: client-name
 aws_region   = "ap-southeast-1"
-vpc_cidr     = "10.0.0.0/16"
-az_count     = 2
+auto_backup  = true                      # Tag: auto-backup
+# --- Networking -----------------------------------------------------------
+
+vpc_cidr = "10.0.0.0/16"
+az_count = 2
 
 # Services — each key becomes the service name used in all AWS resource names.
 # Add a new entry here to provision the full stack for a new service:

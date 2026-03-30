@@ -8,10 +8,27 @@ variable "project_name" {
   }
 }
 
+variable "client_name" {
+  description = "Client or organization name for tagging (e.g., DAP, Quanby)"
+  type        = string
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string
   default     = "ap-southeast-1"
+}
+
+variable "auto_backup" {
+  description = "Enable automatic backups via tagging"
+  type        = bool
+  default     = true
+}
+
+variable "extra_tags" {
+  description = "Additional tags to apply to all resources"
+  type        = map(string)
+  default     = {}
 }
 
 variable "vpc_cidr" {

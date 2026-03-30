@@ -20,8 +20,7 @@ resource "aws_ecs_cluster" "main" {
   }
 
   tags = {
-    Name        = "${var.project_name}-cluster-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-cluster-${var.environment}"
   }
 }
 
@@ -44,8 +43,7 @@ resource "aws_iam_role" "ecs_execution" {
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role.json
 
   tags = {
-    Name        = "${var.project_name}-ecs-execution-role-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-ecs-execution-role-${var.environment}"
   }
 }
 
@@ -60,8 +58,7 @@ resource "aws_iam_role" "ecs_task" {
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role.json
 
   tags = {
-    Name        = "${var.project_name}-ecs-task-role-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-ecs-task-role-${var.environment}"
   }
 }
 
@@ -101,9 +98,8 @@ resource "aws_ecs_task_definition" "service" {
 
   tags = {
     Name        = "${var.project_name}-${each.key}-${var.environment}"
-    Environment = var.environment
-    Service     = each.key
-    Placeholder = "true"
+    service     = each.key
+    placeholder = "true"
   }
 }
 
@@ -140,9 +136,8 @@ resource "aws_ecs_service" "service" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${each.key}-${var.environment}-service"
-    Environment = var.environment
-    Service     = each.key
+    Name    = "${var.project_name}-${each.key}-${var.environment}-service"
+    service = each.key
   }
 }
 

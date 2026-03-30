@@ -32,8 +32,7 @@ resource "aws_lb" "main" {
   enable_deletion_protection = var.enable_deletion_protection
 
   tags = {
-    Name        = "${var.project_name}-alb-${var.environment}"
-    Environment = var.environment
+    Name = "${var.project_name}-alb-${var.environment}"
   }
 }
 
@@ -62,9 +61,8 @@ resource "aws_lb_target_group" "service" {
   }
 
   tags = {
-    Name        = "${var.project_name}-${each.key}-tg-${var.environment}"
-    Environment = var.environment
-    Service     = each.key
+    Name    = "${var.project_name}-${each.key}-tg-${var.environment}"
+    service = each.key
   }
 }
 

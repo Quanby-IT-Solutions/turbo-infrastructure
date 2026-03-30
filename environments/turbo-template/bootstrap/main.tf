@@ -1,10 +1,10 @@
 # =============================================================================
 # Bootstrap: S3 bucket + DynamoDB table for Terraform remote state
 # =============================================================================
-# Run this ONCE before using any environment:
-#   cd bootstrap
+# Run this ONCE before using any environment (staging/production):
+#   cd environments/turbo-template/bootstrap
 #   terraform init
-#   terraform apply -var="project_name=turbo-template"
+#   terraform apply
 #
 # This uses LOCAL state intentionally (chicken-and-egg: can't store state
 # remotely before the remote backend exists).
@@ -19,10 +19,6 @@ terraform {
       version = "~> 5.0"
     }
   }
-}
-
-provider "aws" {
-  region = var.aws_region
 }
 
 # -----------------------------------------------------------------------------
@@ -42,6 +38,21 @@ variable "project_name" {
 }
 
 # -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+
+provider "aws" {
+  region = var.aws_region
+
+  default_tags {
+    tags = {
+      project-name = var.project_name
+      managed-by   = "terraform-bootstrap"
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
 # S3 Bucket (state storage)
 # -----------------------------------------------------------------------------
 
@@ -53,8 +64,7 @@ resource "aws_s3_bucket" "terraform_state" {
   }
 
   tags = {
-    Name      = "${var.project_name}-terraform-state"
-    ManagedBy = "terraform-bootstrap"
+    Name = "${var.project_name}-terraform-state"
   }
 }
 
@@ -100,8 +110,7 @@ resource "aws_dynamodb_table" "terraform_locks" {
   }
 
   tags = {
-    Name      = "${var.project_name}-terraform-locks"
-    ManagedBy = "terraform-bootstrap"
+    Name = "${var.project_name}-terraform-locks"
   }
 }
 

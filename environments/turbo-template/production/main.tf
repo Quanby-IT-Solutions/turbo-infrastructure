@@ -13,15 +13,26 @@ terraform {
   }
 }
 
+locals {
+  environment = "production"
+
+  default_tags = merge(
+    {
+      environment  = local.environment
+      project-name = var.project_name
+      client-name  = var.client_name
+      managed-by   = "terraform"
+      auto-backup  = tostring(var.auto_backup)
+    },
+    var.extra_tags,
+  )
+}
+
 provider "aws" {
   region = var.aws_region
 
   default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = "production"
-      ManagedBy   = "terraform"
-    }
+    tags = local.default_tags
   }
 }
 
@@ -31,7 +42,7 @@ module "networking" {
   source = "../../../modules/aws/networking"
 
   project_name            = var.project_name
-  environment             = "production"
+  environment             = local.environment
   vpc_cidr                = var.vpc_cidr
   az_count                = var.az_count
   enable_nat_ha           = var.enable_nat_ha
@@ -46,7 +57,7 @@ module "ecr" {
   source = "../../../modules/aws/ecr"
 
   project_name          = var.project_name
-  environment           = "production"
+  environment           = local.environment
   image_retention_count = 30
   image_tag_mutability  = "IMMUTABLE"
   encryption_type       = "KMS"
@@ -59,7 +70,7 @@ module "alb" {
   source = "../../../modules/aws/alb"
 
   project_name               = var.project_name
-  environment                = "production"
+  environment                = local.environment
   vpc_id                     = module.networking.vpc_id
   public_subnet_ids          = module.networking.public_subnet_ids
   alb_security_group_id      = module.networking.alb_security_group_id
@@ -74,7 +85,7 @@ module "ecs" {
   source = "../../../modules/aws/ecs"
 
   project_name               = var.project_name
-  environment                = "production"
+  environment                = local.environment
   private_subnet_ids         = module.networking.private_subnet_ids
   service_security_group_ids = module.networking.ecs_service_security_group_ids
   services                   = var.services
@@ -87,7 +98,7 @@ module "monitoring" {
   source = "../../../modules/aws/monitoring"
 
   project_name        = var.project_name
-  environment         = "production"
+  environment         = local.environment
   log_retention_days  = 90
   enable_alarms       = var.enable_alarms
   alarm_sns_topic_arn = var.alarm_sns_topic_arn
