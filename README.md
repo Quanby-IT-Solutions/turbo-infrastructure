@@ -7,14 +7,15 @@ Each project lives under `environments/<project-name>/` and has its own `staging
 
 ```
 infrastructure/
-├── bootstrap/                        # One-time setup: S3 + DynamoDB for remote state
 ├── environments/
 │   └── <project-name>/               # One folder per project (e.g. turbo-template)
-│       ├── staging/                  # ECR + CloudWatch only (app runs on EC2/Docker Compose)
+│       ├── bootstrap/                # One-time setup: S3 + DynamoDB for remote state
+│       ├── staging/                  # EC2 + ECR + CloudWatch (app runs via Docker Compose)
 │       └── production/               # Full stack: VPC, ALB, ECS Fargate, ECR, CloudWatch
 └── modules/
     └── aws/
-        ├── networking/               # VPC, subnets, NAT Gateway, security groups
+        ├── ec2/                      # EC2 instance, VPC, security group, Elastic IP (staging)
+        ├── networking/               # VPC, subnets, NAT Gateway, security groups (production)
         ├── ecr/                      # Container registries + lifecycle policies
         ├── alb/                      # Load balancer, target groups, HTTPS listeners
         ├── ecs/                      # ECS cluster, task definitions, Fargate services
@@ -133,7 +134,7 @@ aws sts get-caller-identity
 ### 3. Clone the repo
 
 ```bash
-git clone git@github.com:mjbalcueva/infrastructure.git
+git clone git@github.com:Quanby-IT-Solutions/turbo-infrastructure.git
 cd infrastructure
 ```
 
@@ -146,7 +147,7 @@ cd infrastructure
 This creates the S3 bucket and DynamoDB table used to store Terraform state. Uses local state intentionally (can't store state remotely before the remote backend exists).
 
 ```bash
-cd bootstrap
+cd environments/turbo-template/bootstrap
 terraform init
 terraform apply -var="project_name=turbo-template"
 ```
@@ -155,7 +156,7 @@ You only need to do this once per project. If the S3 bucket already exists, skip
 
 ### Step 2: Deploy staging
 
-Staging only provisions **ECR repos** and **CloudWatch log groups**. The EC2 instance and Docker Compose deployment are managed by the app repo's deploy workflow.
+Staging provisions an **EC2 instance** (with its own VPC, security group, and Elastic IP), **ECR repositories**, and **CloudWatch log groups**. The app repo's deploy workflow SSHs into the EC2 instance and deploys containers via Docker Compose + Nginx.
 
 ```bash
 cd environments/turbo-template/staging
@@ -180,12 +181,18 @@ terraform output
 
 Staging outputs:
 
-| Terraform output                  | What it is                 |
-| --------------------------------- | -------------------------- |
-| `ecr_repository_urls["web"]`      | ECR URL for web images     |
-| `ecr_repository_urls["backend"]`  | ECR URL for backend images |
-| `ecr_repository_names["web"]`     | ECR repo name for web      |
-| `ecr_repository_names["backend"]` | ECR repo name for backend  |
+| Terraform output                  | What it is                                       |
+| --------------------------------- | ------------------------------------------------ |
+| `ec2_public_ip`                   | Elastic IP of the staging EC2 instance           |
+| `ec2_ssh_command`                 | SSH command to connect to the instance           |
+| `ec2_ssh_private_key`             | SSH private key (only when Terraform creates it) |
+| `ec2_key_pair_name`               | Name of the EC2 key pair                         |
+| `ecr_repository_urls["web"]`      | ECR URL for web images                           |
+| `ecr_repository_urls["backend"]`  | ECR URL for backend images                       |
+| `ecr_repository_names["web"]`     | ECR repo name for web                            |
+| `ecr_repository_names["backend"]` | ECR repo name for backend                        |
+
+> **Note:** Run `terraform output -raw ec2_ssh_private_key > key.pem && chmod 600 key.pem` to save the SSH key.
 
 ### Step 4: Deploy production (when ready)
 
@@ -222,6 +229,9 @@ Production outputs:
 | `ecr_repository_names["web"]`     | `ECR_REPOSITORY_WEB`                  |
 | `ecr_repository_names["backend"]` | `ECR_REPOSITORY_BACKEND`              |
 | `ecs_execution_role_arn`          | `ECS_EXECUTION_ROLE_ARN`              |
+| `ecs_task_role_arn`               | `ECS_TASK_ROLE_ARN`                   |
+| `alb_dns_name`                    | ALB DNS name (CNAME target)           |
+| `alb_zone_id`                     | ALB hosted zone ID (Route53 alias)    |
 | `nat_gateway_public_ips`          | For allowlisting in external services |
 
 ---
@@ -249,6 +259,13 @@ Create two GitHub environments: **staging** and **production**.
 | `ECR_REPOSITORY_WEB`     | `ecr_repository_names["web"]` output     |
 | `ECR_REPOSITORY_BACKEND` | `ecr_repository_names["backend"]` output |
 
+**Staging environment secrets:**
+
+| Secret        | Value (from `terraform output`)                |
+| ------------- | ---------------------------------------------- |
+| `EC2_HOST`    | `ec2_public_ip` output (Elastic IP)            |
+| `EC2_SSH_KEY` | `ec2_ssh_private_key` output (private key PEM) |
+
 **Production environment variables (all of staging, plus):**
 
 | Variable                 | Value (from `terraform output`)          |
@@ -260,6 +277,7 @@ Create two GitHub environments: **staging** and **production**.
 | `ECS_SERVICE_WEB`        | `ecs_service_names["web"]` output        |
 | `ECS_SERVICE_BACKEND`    | `ecs_service_names["backend"]` output    |
 | `ECS_EXECUTION_ROLE_ARN` | `ecs_execution_role_arn` output          |
+| `ECS_TASK_ROLE_ARN`      | `ecs_task_role_arn` output               |
 
 ### 3. IAM permissions for CI/CD user
 
@@ -276,12 +294,12 @@ The CI/CD IAM user needs these permissions:
 
 ### Staging (EC2 + Docker Compose)
 
-Staging runs on an EC2 instance. Point your domain to the EC2's **Elastic IP**:
+Staging runs on an EC2 instance. Point your domain to the EC2's **Elastic IP** (from `terraform output ec2_public_ip`):
 
-| Type | Name       | Value              | TTL |
-| ---- | ---------- | ------------------ | --- |
-| A    | `turbo`    | `<ec2-elastic-ip>` | 600 |
-| A    | `turbo-be` | `<ec2-elastic-ip>` | 600 |
+| Type | Name           | Value              | TTL |
+| ---- | -------------- | ------------------ | --- |
+| A    | `stg-turbo`    | `<ec2-elastic-ip>` | 600 |
+| A    | `stg-turbo-be` | `<ec2-elastic-ip>` | 600 |
 
 Both subdomains point to the same EC2 — your reverse proxy (Nginx/Caddy) routes by hostname.
 
@@ -289,12 +307,10 @@ Both subdomains point to the same EC2 — your reverse proxy (Nginx/Caddy) route
 
 ### Production (ALB + ECS Fargate)
 
-After `terraform apply` for production, get the ALB DNS name:
+After `terraform apply` for production, get the ALB DNS name from the output:
 
 ```bash
-# The ALB DNS name is in the AWS Console: EC2 → Load Balancers
-# or via CLI:
-aws elbv2 describe-load-balancers --query "LoadBalancers[?contains(LoadBalancerName, 'turbo-template')].DNSName" --output text
+terraform output alb_dns_name
 ```
 
 Point your domain to the ALB using a **CNAME** record:
@@ -346,9 +362,23 @@ Set them in the ECS task definition via your app repo's deploy workflow. Common 
 
 ## How It Works
 
-### Services Map
+### Staging (EC2 Module)
 
-Every environment is configured through a `services` map in `terraform.tfvars`. Each key becomes a named service — Terraform automatically provisions the full AWS stack for it (ECR repo, ECS task/service, ALB target group, security group, log group).
+Staging provisions a single EC2 instance with a lightweight VPC. Terraform manages the full lifecycle:
+
+- **VPC** with one public subnet, internet gateway, and route table
+- **EC2 instance** (`t3.small` by default) with an Elastic IP
+- **Security group** allowing SSH (22), HTTP (80), HTTPS (443), and configurable app ports
+- **IAM instance profile** with ECR pull and CloudWatch Logs permissions
+- **User data script** that installs Docker, Docker Compose, Nginx, Certbot, and AWS CLI
+- **ECR repositories** for each service (mutable tags)
+- **CloudWatch log groups** with 14-day retention
+
+The app repo's CI/CD pipeline SSHs into the EC2 instance and deploys via `docker compose up`.
+
+### Production (Services Map)
+
+Every production environment is configured through a `services` map in `terraform.tfvars`. Each key becomes a named service — Terraform automatically provisions the full AWS stack for it (ECR repo, ECS task/service, ALB target group, security group, log group).
 
 ```hcl
 services = {
@@ -393,15 +423,20 @@ To add a new service (e.g. a background worker), add a new entry to the map and 
 
 ### Staging vs. Production
 
-|                       | Staging | Production |
-| --------------------- | ------- | ---------- |
-| ECR repositories      | ✅      | ✅         |
-| CloudWatch log groups | ✅      | ✅         |
-| VPC + networking      | ❌      | ✅         |
-| ALB + HTTPS           | ❌      | ✅         |
-| ECS Fargate services  | ❌      | ✅         |
+|                         | Staging                      | Production                                       |
+| ----------------------- | ---------------------------- | ------------------------------------------------ |
+| Compute                 | EC2 + Docker Compose + Nginx | ECS Fargate                                      |
+| Networking              | Simple VPC (1 public subnet) | Full VPC (public + private subnets, NAT Gateway) |
+| ECR repositories        | ✅ (mutable tags)            | ✅ (immutable tags, KMS encrypted)               |
+| CloudWatch log groups   | ✅ (14-day retention)        | ✅ (90-day retention)                            |
+| Load balancer (ALB)     | ❌ (Nginx reverse proxy)     | ✅ (with host-header routing)                    |
+| HTTPS                   | Certbot on EC2               | ACM certificate on ALB                           |
+| VPC Flow Logs           | ❌                           | ✅                                               |
+| S3 VPC Gateway Endpoint | ❌                           | ✅                                               |
+| CloudWatch alarms       | ❌                           | Optional                                         |
+| Auto scaling            | ❌                           | Optional                                         |
 
-Staging infrastructure is minimal — the app runs on EC2 + Docker Compose managed by the app repo. Terraform only manages shared AWS resources (ECR, logs) so both environments share the same registry.
+Staging runs on a single EC2 instance managed by Terraform. The app repo's deploy workflow SSHs into the instance and deploys via Docker Compose.
 
 ---
 
@@ -443,12 +478,12 @@ Repeat for `production/`.
 
 ```bash
 # Bootstrap remote state
-cd bootstrap
+cd environments/<your-project-name>/bootstrap
 terraform init
 terraform apply -var="project_name=<your-project-name>"
 
 # Deploy staging
-cd ../environments/<your-project-name>/staging
+cd ../staging
 terraform init && terraform plan && terraform apply
 
 # Deploy production (when ready)
@@ -499,15 +534,21 @@ terraform destroy
 
 ## Key Design Decisions
 
-1. **Placeholder task definitions**: ECS services are initially created with `nginx:alpine`. The app repo's deploy workflow registers the real image and updates the service. Terraform never touches it again.
+1. **EC2 for staging, ECS Fargate for production**: Staging uses a single EC2 instance with Docker Compose for cost efficiency. Production uses ECS Fargate for scalability and zero-server management.
 
-2. **`ignore_changes` on ECS**: Terraform ignores `task_definition` and `desired_count` after initial creation, so app deploys are never reverted by a `terraform apply`.
+2. **Terraform-managed EC2**: The staging EC2 instance (VPC, subnet, security group, Elastic IP, IAM role) is fully managed by Terraform. User data auto-installs Docker, Docker Compose, Nginx, Certbot, and AWS CLI.
 
-3. **Separate state per environment**: Each environment has its own S3 state file (`staging/terraform.tfstate`, `production/terraform.tfstate`) for independent lifecycle management.
+3. **Placeholder task definitions**: ECS services are initially created with `nginx:alpine`. The app repo's deploy workflow registers the real image and updates the service. Terraform never touches it again.
 
-4. **Single NAT Gateway by default**: Cost-optimized. For high-availability production, set `enable_nat_ha = true` in `terraform.tfvars` to provision one NAT Gateway per AZ.
+4. **`ignore_changes` on ECS**: Terraform ignores `task_definition` and `desired_count` after initial creation, so app deploys are never reverted by a `terraform apply`.
 
-5. **Services map pattern**: All per-service AWS resources are driven by a single `services` map. Adding or removing a service requires only a `terraform.tfvars` change — no module edits.
+5. **Separate state per environment**: Each environment has its own S3 state file (`staging/terraform.tfstate`, `production/terraform.tfstate`) for independent lifecycle management.
+
+6. **Single NAT Gateway by default**: Cost-optimized. For high-availability production, set `enable_nat_ha = true` in `terraform.tfvars` to provision one NAT Gateway per AZ.
+
+7. **Services map pattern**: All per-service AWS resources are driven by a single `services` map. Adding or removing a service requires only a `terraform.tfvars` change — no module edits.
+
+8. **Production hardening**: ECR uses immutable tags and KMS encryption, ALB has deletion protection enabled, VPC Flow Logs are on with 90-day retention, and EC2 uses IMDSv2 only.
 
 ## Expanding to GCP
 
@@ -516,6 +557,7 @@ The module structure is designed for multi-cloud expansion:
 ```
 modules/
 ├── aws/           # ← current
+│   ├── ec2/
 │   ├── networking/
 │   ├── ecr/
 │   ├── ecs/
