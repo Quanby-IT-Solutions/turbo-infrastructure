@@ -11,7 +11,27 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Find AZs that support the chosen instance type to avoid gp3/capacity errors
+data "aws_ec2_instance_type_offerings" "available" {
+  filter {
+    name   = "instance-type"
+    values = [var.instance_type]
+  }
+
+  location_type = "availability-zone"
+}
+
 data "aws_region" "current" {}
+
+locals {
+  # AZs that are both generally available AND support the chosen instance type
+  compatible_azs = tolist(setintersection(
+    toset(data.aws_availability_zones.available.names),
+    toset(data.aws_ec2_instance_type_offerings.available.locations)
+  ))
+
+  selected_az = var.availability_zone != "" ? var.availability_zone : local.compatible_azs[0]
+}
 
 # Latest Amazon Linux 2023 AMI (used when var.ami_id is empty)
 data "aws_ami" "amazon_linux" {
@@ -88,7 +108,7 @@ resource "aws_vpc" "main" {
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, 1)
-  availability_zone       = data.aws_availability_zones.available.names[0]
+  availability_zone       = local.selected_az
   map_public_ip_on_launch = true
 
   tags = {

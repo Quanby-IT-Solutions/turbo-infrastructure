@@ -26,6 +26,12 @@ variable "key_name" {
   default     = ""
 }
 
+variable "availability_zone" {
+  description = "Specific AZ for the EC2 instance. Leave empty to auto-select an AZ compatible with the instance type."
+  type        = string
+  default     = ""
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string

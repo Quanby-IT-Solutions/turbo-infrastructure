@@ -1,5 +1,10 @@
 # --- Instance Outputs -----------------------------------------------------
 
+output "availability_zone" {
+  description = "AZ selected for the EC2 instance"
+  value       = local.selected_az
+}
+
 output "instance_id" {
   description = "EC2 instance ID"
   value       = aws_instance.main.id
