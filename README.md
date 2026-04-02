@@ -193,7 +193,30 @@ Staging outputs:
 | `ecr_repository_names["web"]`     | ECR repo name for web                            |
 | `ecr_repository_names["backend"]` | ECR repo name for backend                        |
 
-> **Note:** Run `terraform output -raw ec2_ssh_private_key > key.pem && chmod 600 key.pem` to save the SSH key.
+#### SSH into the staging EC2 instance
+
+When `ec2_key_name` is left empty in `terraform.tfvars`, Terraform generates an ED25519 key pair and stores the private key in the state file. To extract it and connect:
+
+```bash
+# 1. Export the private key from Terraform state
+terraform output -raw ec2_ssh_private_key > turbo-template-staging.pem
+
+# 2. Restrict file permissions (SSH refuses keys that are too open)
+chmod 600 turbo-template-staging.pem
+
+# 3. Connect to the instance
+ssh -i turbo-template-staging.pem ec2-user@$(terraform output -raw ec2_public_ip)
+```
+
+> **Tip:** Store the `.pem` file somewhere safe and add it to `.gitignore` — never commit private keys.
+
+**Alternative — AWS Session Manager (no key needed):**
+
+The EC2 instance has the SSM agent role attached, so you can also connect without SSH keys:
+
+```bash
+aws ssm start-session --target $(terraform output -raw ec2_instance_id) --region ap-southeast-1
+```
 
 ### Step 4: Deploy production (when ready)
 
