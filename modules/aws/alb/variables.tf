@@ -50,3 +50,20 @@ variable "enable_deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "target_type" {
+  description = "Target type for ALB target groups. Use 'instance' for EC2/ASG, 'ip' for ECS Fargate."
+  type        = string
+  default     = "instance"
+
+  validation {
+    condition     = contains(["instance", "ip", "lambda"], var.target_type)
+    error_message = "target_type must be 'instance', 'ip', or 'lambda'."
+  }
+}
+
+variable "deregistration_delay" {
+  description = "Time (seconds) to wait before deregistering targets. Lower values speed up deployments."
+  type        = number
+  default     = 120
+}

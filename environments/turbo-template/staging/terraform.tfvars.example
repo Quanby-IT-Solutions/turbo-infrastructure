@@ -8,32 +8,42 @@
 project_name = "turbo-template"          # Used in resource names
 client_name  = "Quanby"                  # Tag: client-name
 aws_region   = "ap-southeast-1"
-auto_backup  = true                      # Tag: auto-backup
+auto_backup  = false                     # Tag: auto-backup
 
-# --- EC2 ------------------------------------------------------------------
+# --- Networking -----------------------------------------------------------
 
-ec2_instance_type    = "t3.small"
+vpc_cidr = "10.1.0.0/16"
+az_count = 2
+
+# --- EC2 / ASG ------------------------------------------------------------
+
+ec2_instance_type    = "t3.medium"
 ec2_key_name         = ""                 # Existing key pair name, or empty to auto-create
 ec2_root_volume_size = 30
 
-# Restrict SSH access to your IP for security (e.g., ["203.0.113.5/32"])
-ec2_allowed_ssh_cidrs = ["0.0.0.0/0"]
+# SSH access — empty list means SSM-only (more secure)
+ec2_allowed_ssh_cidrs = []
+
+# Single instance for staging (cost savings)
+asg_min_size         = 1
+asg_desired_capacity = 1
+asg_max_size         = 2
+
+# --- SSL ------------------------------------------------------------------
+# certificate_arn = "arn:aws:acm:ap-southeast-1:ACCOUNT:certificate/CERT-ID"
 
 # --- Services -------------------------------------------------------------
+# Each entry creates: ECR repo, ALB target group, SG rule, CloudWatch log group.
 
 services = {
   web = {
     port              = 3001
     health_check_path = "/"
-    cpu               = "256"
-    memory            = "512"
     domain            = "stg-turbo.quanbyit.com"
   }
   backend = {
     port                 = 3000
     health_check_path    = "/api/v1/health"
-    cpu                  = "256"
-    memory               = "512"
     domain               = "stg-turbo-be.quanbyit.com"
     health_check_matcher = "200"
     allow_vpc_egress     = true

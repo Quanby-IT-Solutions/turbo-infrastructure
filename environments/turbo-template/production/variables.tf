@@ -31,6 +31,8 @@ variable "extra_tags" {
   default     = {}
 }
 
+# --- Networking -----------------------------------------------------------
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC (e.g., 10.0.0.0/16)"
   type        = string
@@ -43,28 +45,108 @@ variable "vpc_cidr" {
 }
 
 variable "az_count" {
-  description = "Number of availability zones (1-3)"
+  description = "Number of availability zones (minimum 2 for ALB and multi-AZ ASG)"
   type        = number
   default     = 2
 
   validation {
-    condition     = var.az_count >= 1 && var.az_count <= 3
-    error_message = "az_count must be between 1 and 3."
+    condition     = var.az_count >= 2 && var.az_count <= 3
+    error_message = "az_count must be between 2 and 3."
   }
 }
+
+# --- EC2 / ASG ------------------------------------------------------------
+
+variable "ec2_instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "ec2_key_name" {
+  description = "Name of an existing EC2 key pair for SSH access. Leave empty for SSM-only access."
+  type        = string
+  default     = ""
+}
+
+variable "ec2_root_volume_size" {
+  description = "Root EBS volume size in GB"
+  type        = number
+  default     = 30
+}
+
+variable "ec2_allowed_ssh_cidrs" {
+  description = "CIDR blocks allowed to SSH. Empty list uses SSM-only (recommended for production)."
+  type        = list(string)
+  default     = []
+}
+
+variable "asg_min_size" {
+  description = "Minimum number of instances in the ASG"
+  type        = number
+  default     = 2
+}
+
+variable "asg_desired_capacity" {
+  description = "Desired number of instances in the ASG"
+  type        = number
+  default     = 2
+}
+
+variable "asg_max_size" {
+  description = "Maximum number of instances in the ASG"
+  type        = number
+  default     = 4
+}
+
+# --- Instance Refresh (zero-downtime deployments) -------------------------
+
+variable "instance_refresh_min_healthy" {
+  description = "Minimum healthy percentage during instance refresh (100 = true zero-downtime)"
+  type        = number
+  default     = 100
+}
+
+variable "instance_refresh_max_healthy" {
+  description = "Maximum healthy percentage during instance refresh (200 = double capacity briefly)"
+  type        = number
+  default     = 200
+}
+
+variable "instance_warmup" {
+  description = "Seconds to wait for new instances to warm up before counting as healthy"
+  type        = number
+  default     = 300
+}
+
+variable "health_check_grace_period" {
+  description = "Seconds after instance launch before health checks begin"
+  type        = number
+  default     = 300
+}
+
+# --- SSL ------------------------------------------------------------------
+
+variable "certificate_arn" {
+  description = "ACM certificate ARN for HTTPS. When set, HTTPS listener is created with HTTP-to-HTTPS redirect."
+  type        = string
+  default     = ""
+}
+
+# --- Services -------------------------------------------------------------
 
 variable "services" {
   description = <<-EOT
     Map of services to deploy. Each key becomes the service name used in all resource names.
-    Adding a new service here is the only change needed to provision its full AWS stack:
-    ECR repo, ECS task/service, ALB target group, security group, and CloudWatch log group.
+    Adding a new service here provisions its full stack: ECR repo, ALB target group,
+    security group rules, and CloudWatch log group.
   EOT
 
   type = map(object({
     port                 = number
     health_check_path    = string
-    cpu                  = string
-    memory               = string
+    cpu                  = optional(string, "512")
+    memory               = optional(string, "1024")
     desired_count        = optional(number, 1)
     expose_via_alb       = optional(bool, true)
     is_alb_default       = optional(bool, false)
@@ -84,17 +166,7 @@ variable "services" {
   }
 }
 
-variable "certificate_arn" {
-  description = "ACM certificate ARN for HTTPS. When set, HTTPS listener is created with HTTP-to-HTTPS redirect."
-  type        = string
-  default     = ""
-}
-
-variable "enable_nat_ha" {
-  description = "Create one NAT Gateway per AZ for high availability (more expensive)"
-  type        = bool
-  default     = false
-}
+# --- Monitoring -----------------------------------------------------------
 
 variable "enable_alarms" {
   description = "Enable CloudWatch alarms"

@@ -1,5 +1,8 @@
 # =============================================================================
-# Production Environment
+# Production Environment — EC2 + ALB + ASG
+# =============================================================================
+# Production uses ALB → ASG → EC2 + Docker with zero-downtime deployments
+# via ASG instance refresh. Minimum 2 instances across 2 AZs.
 # =============================================================================
 
 terraform {
@@ -37,18 +40,22 @@ provider "aws" {
 }
 
 # --- Networking -----------------------------------------------------------
+# VPC, subnets, IGW. No NAT initially (EC2 in public subnets).
+# Private subnets created but unused (available for future RDS, etc.).
 
 module "networking" {
   source = "../../../modules/aws/networking"
 
-  project_name            = var.project_name
-  environment             = local.environment
-  vpc_cidr                = var.vpc_cidr
-  az_count                = var.az_count
-  enable_nat_ha           = var.enable_nat_ha
-  enable_flow_logs        = true
-  flow_log_retention_days = 90
-  services                = var.services
+  project_name               = var.project_name
+  environment                = local.environment
+  vpc_cidr                   = var.vpc_cidr
+  az_count                   = var.az_count
+  enable_nat_gateway         = false
+  enable_nat_ha              = false
+  enable_flow_logs           = true
+  flow_log_retention_days    = 90
+  create_ecs_security_groups = false
+  services                   = var.services
 }
 
 # --- ECR -----------------------------------------------------------------
@@ -75,21 +82,39 @@ module "alb" {
   public_subnet_ids          = module.networking.public_subnet_ids
   alb_security_group_id      = module.networking.alb_security_group_id
   services                   = var.services
+  target_type                = "instance"
+  deregistration_delay       = 120
   certificate_arn            = var.certificate_arn
   enable_deletion_protection = true
 }
 
-# --- ECS -----------------------------------------------------------------
+# --- EC2 ASG --------------------------------------------------------------
 
-module "ecs" {
-  source = "../../../modules/aws/ecs"
+module "ec2_asg" {
+  source = "../../../modules/aws/ec2-asg"
 
-  project_name               = var.project_name
-  environment                = local.environment
-  private_subnet_ids         = module.networking.private_subnet_ids
-  service_security_group_ids = module.networking.ecs_service_security_group_ids
-  services                   = var.services
-  target_group_arns          = module.alb.target_group_arns
+  project_name          = var.project_name
+  environment           = local.environment
+  vpc_id                = module.networking.vpc_id
+  subnet_ids            = module.networking.public_subnet_ids
+  instance_type         = var.ec2_instance_type
+  min_size              = var.asg_min_size
+  desired_capacity      = var.asg_desired_capacity
+  max_size              = var.asg_max_size
+  root_volume_size      = var.ec2_root_volume_size
+  key_name              = var.ec2_key_name
+  allowed_ssh_cidrs     = var.ec2_allowed_ssh_cidrs
+  associate_public_ip   = true
+  alb_security_group_id = module.networking.alb_security_group_id
+  target_group_arns     = values(module.alb.target_group_arns)
+  services              = var.services
+
+  # Production: zero-downtime rolling deployments
+  enable_instance_refresh = true
+  min_healthy_percentage  = var.instance_refresh_min_healthy
+  max_healthy_percentage  = var.instance_refresh_max_healthy
+  instance_warmup         = var.instance_warmup
+  health_check_grace_period = var.health_check_grace_period
 }
 
 # --- Monitoring ----------------------------------------------------------
@@ -102,12 +127,8 @@ module "monitoring" {
   log_retention_days  = 90
   enable_alarms       = var.enable_alarms
   alarm_sns_topic_arn = var.alarm_sns_topic_arn
-  ecs_cluster_name    = module.ecs.cluster_name
 
   service_names             = toset(keys(var.services))
-  ecs_service_names         = module.ecs.service_names
   target_group_arn_suffixes = module.alb.target_group_arn_suffixes
-
-  # ALB alarms
-  alb_arn_suffix = module.alb.alb_arn_suffix
+  alb_arn_suffix            = module.alb.alb_arn_suffix
 }

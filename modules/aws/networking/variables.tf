@@ -36,6 +36,18 @@ variable "enable_nat_ha" {
   default     = false
 }
 
+variable "enable_nat_gateway" {
+  description = "Create NAT Gateway(s) for private subnet internet access. Set to false when EC2 instances use public subnets."
+  type        = bool
+  default     = true
+}
+
+variable "create_ecs_security_groups" {
+  description = "Create per-service ECS security groups. Set to false when using EC2/ASG compute instead of ECS."
+  type        = bool
+  default     = true
+}
+
 variable "enable_flow_logs" {
   description = "Enable VPC Flow Logs to CloudWatch for network auditing"
   type        = bool

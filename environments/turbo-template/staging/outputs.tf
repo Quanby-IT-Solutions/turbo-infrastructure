@@ -1,43 +1,41 @@
 # =============================================================================
 # Staging Outputs
 # =============================================================================
-# Copy these to GitHub → Settings → Environments → staging → Variables
+# Copy these to GitHub → Settings → Environments → staging → Variables/Secrets
 # =============================================================================
 
-# --- EC2 Outputs ----------------------------------------------------------
+# --- Networking ---
 
-output "ec2_instance_id" {
-  description = "EC2 instance ID"
-  value       = module.ec2.instance_id
+output "vpc_id" {
+  description = "VPC ID"
+  value       = module.networking.vpc_id
 }
 
-output "ec2_public_ip" {
-  description = "Public IP of the staging EC2 instance → GitHub secret: EC2_HOST"
-  value       = module.ec2.instance_public_ip
+# --- ALB ---
+
+output "alb_dns_name" {
+  description = "ALB DNS name → CNAME target for staging domains"
+  value       = module.alb.alb_dns_name
 }
 
-output "ec2_private_ip" {
-  description = "Private IP of the staging EC2 instance"
-  value       = module.ec2.instance_private_ip
+output "alb_zone_id" {
+  description = "ALB hosted zone ID (for Route53 alias records)"
+  value       = module.alb.alb_zone_id
 }
 
-output "ec2_ssh_command" {
-  description = "SSH command to connect to the staging instance"
-  value       = module.ec2.ssh_connection_command
+# --- ASG ---
+
+output "asg_name" {
+  description = "Auto Scaling Group name → GitHub var: ASG_NAME"
+  value       = module.ec2_asg.asg_name
 }
 
-output "ec2_ssh_private_key" {
-  description = "SSH private key (only when Terraform generates the key pair) → GitHub secret: EC2_SSH_KEY"
-  value       = module.ec2.ssh_private_key_pem
-  sensitive   = true
+output "launch_template_id" {
+  description = "Launch template ID → GitHub var: LAUNCH_TEMPLATE_ID"
+  value       = module.ec2_asg.launch_template_id
 }
 
-output "ec2_key_pair_name" {
-  description = "Name of the EC2 key pair"
-  value       = module.ec2.key_pair_name
-}
-
-# --- ECR Outputs ----------------------------------------------------------
+# --- ECR ---
 
 output "ecr_repository_names" {
   description = "Map of service name → ECR repository name"

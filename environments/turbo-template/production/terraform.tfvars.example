@@ -15,46 +15,62 @@ auto_backup  = true                      # Tag: auto-backup
 vpc_cidr = "10.0.0.0/16"
 az_count = 2
 
-# Services — each key becomes the service name used in all AWS resource names.
-# Add a new entry here to provision the full stack for a new service:
-#   ECR repo, ECS task/service, ALB target group, security group, CloudWatch log group.
+# --- EC2 / ASG ------------------------------------------------------------
+
+ec2_instance_type    = "t3.medium"
+ec2_key_name         = ""                # Leave empty to let Terraform create a key pair
+ec2_root_volume_size = 30
+
+# SSH access — empty list means SSM-only (recommended for production)
+ec2_allowed_ssh_cidrs = []
+
+# Multi-instance ASG for high availability
+asg_min_size         = 2
+asg_desired_capacity = 2
+asg_max_size         = 4
+
+# --- Instance Refresh (zero-downtime deployments) -------------------------
+# These control rolling update behavior during deployments.
+
+# instance_refresh_min_healthy = 100   # 100% = true zero-downtime
+# instance_refresh_max_healthy = 200   # 200% = briefly double capacity
+# instance_warmup              = 300   # seconds for new instance to warm up
+# health_check_grace_period    = 300   # seconds before health checks begin
+
+# --- Services -------------------------------------------------------------
+# Each key becomes the service name used in all AWS resource names.
+# Adding a new entry provisions: ECR repo, ALB target group, SG rule, CloudWatch log group.
+# cpu/memory are informational (used by docker-compose resource limits).
+
 services = {
   web = {
     port              = 3001
     health_check_path = "/"
-    cpu               = "512"
-    memory            = "1024"
     domain            = "turbo.quanbyit.com" # host-header routing rule on ALB
     is_alb_default    = true                 # web receives all unmatched ALB traffic
-    desired_count     = 1
   }
   backend = {
     port                 = 3000
     health_check_path    = "/api/v1/health"
-    cpu                  = "512"
-    memory               = "1024"
     domain               = "turbo-be.quanbyit.com" # host-header routing rule on ALB
     health_check_matcher = "200"
     allow_vpc_egress     = true # enables DB (5432) + Redis (6379) egress within VPC
-    desired_count        = 1
   }
   # worker = {                          # Example: add a third service
   #   port                 = 3002
   #   health_check_path    = "/health"
-  #   cpu                  = "256"
-  #   memory               = "512"
   #   expose_via_alb       = false       # internal only — no ALB target group
   #   allow_vpc_egress     = true
   # }
 }
 
-enable_alarms = false
-
-# HTTPS — set your ACM certificate ARN to enable HTTPS with HTTP→HTTPS redirect
+# --- SSL ------------------------------------------------------------------
+# Set your ACM certificate ARN to enable HTTPS with HTTP→HTTPS redirect
 # certificate_arn = "arn:aws:acm:ap-southeast-1:123456789012:certificate/abc-123"
 
-# High availability — one NAT Gateway per AZ (increases cost, recommended for production)
-# enable_nat_ha = true
+# --- Monitoring -----------------------------------------------------------
+
+enable_alarms = false
 
 # Alarm notifications — required if enable_alarms = true
 # alarm_sns_topic_arn = "arn:aws:sns:ap-southeast-1:123456789012:alerts"

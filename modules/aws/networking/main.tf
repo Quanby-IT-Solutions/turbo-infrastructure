@@ -3,13 +3,18 @@
 # =============================================================================
 
 locals {
-  nat_count = var.enable_nat_ha ? var.az_count : 1
+  nat_count = var.enable_nat_gateway ? (var.enable_nat_ha ? var.az_count : 1) : 0
 }
 
 # --- Data Sources ---------------------------------------------------------
 
 data "aws_availability_zones" "available" {
   state = "available"
+
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
 }
 
 data "aws_region" "current" {}
@@ -196,7 +201,7 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_route_table_association" "private" {
-  count          = var.az_count
+  count          = var.enable_nat_gateway ? var.az_count : 0
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[var.enable_nat_ha ? count.index : 0].id
 }
@@ -208,7 +213,10 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_id       = aws_vpc.main.id
   service_name = "com.amazonaws.${data.aws_region.current.name}.s3"
 
-  route_table_ids = aws_route_table.private[*].id
+  route_table_ids = concat(
+    aws_route_table.private[*].id,
+    local.nat_count == 0 ? [aws_route_table.public.id] : []
+  )
 
   tags = {
     Name = "${var.project_name}-s3-endpoint-${var.environment}"
@@ -259,7 +267,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group" "ecs_service" {
-  for_each = var.services
+  for_each = var.create_ecs_security_groups ? var.services : {}
 
   name_prefix = "${var.project_name}-ecs-${each.key}-${var.environment}-"
   description = "Allow traffic to ${each.key} containers"
