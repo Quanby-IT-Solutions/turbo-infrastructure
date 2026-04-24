@@ -1,8 +1,9 @@
 # =============================================================================
-# Staging Environment — EC2 + ALB + ASG
+# Staging Environment — EC2 + Elastic IP (minimal)
 # =============================================================================
-# Staging uses the same platform shape as production (ALB → ASG → EC2 + Docker)
-# with minimal capacity: single instance, brief restarts OK during deploys.
+# Staging uses a single EC2 instance with an Elastic IP for a stable public
+# address. Docker Compose + Nginx run directly on the box. No ALB, no ASG.
+# Copy this folder to environments/<project-name>/staging/ and update tfvars.
 # =============================================================================
 
 terraform {
@@ -12,6 +13,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
     }
   }
 }
@@ -39,78 +44,38 @@ provider "aws" {
   }
 }
 
-# --- Networking -----------------------------------------------------------
-# VPC, subnets (public for ALB + EC2, private unused), IGW, no NAT.
-
-module "networking" {
-  source = "../../../modules/aws/networking"
-
-  project_name               = var.project_name
-  environment                = local.environment
-  vpc_cidr                   = var.vpc_cidr
-  az_count                   = var.az_count
-  enable_nat_gateway         = false
-  enable_nat_ha              = false
-  enable_flow_logs           = false
-  create_ecs_security_groups = false
-  services                   = var.services
-}
-
-# --- ECR -----------------------------------------------------------------
+# --- ECR ------------------------------------------------------------------
+# One repo per service — push images here, EC2 pulls via IAM role.
 
 module "ecr" {
   source = "../../../modules/aws/ecr"
 
   project_name          = var.project_name
   environment           = local.environment
-  image_retention_count = 15
+  image_retention_count = 10
   force_delete          = true
   services              = var.services
 }
 
-# --- ALB -----------------------------------------------------------------
+# --- EC2 + Elastic IP -----------------------------------------------------
+# Single instance running Docker Compose + Nginx.
+# Elastic IP keeps DNS stable across stop/start cycles.
 
-module "alb" {
-  source = "../../../modules/aws/alb"
+module "ec2" {
+  source = "../../../modules/aws/ec2"
 
-  project_name               = var.project_name
-  environment                = local.environment
-  vpc_id                     = module.networking.vpc_id
-  public_subnet_ids          = module.networking.public_subnet_ids
-  alb_security_group_id      = module.networking.alb_security_group_id
-  services                   = var.services
-  target_type                = "instance"
-  deregistration_delay       = 60
-  certificate_arn            = var.certificate_arn
-  enable_deletion_protection = false
+  project_name      = var.project_name
+  environment       = local.environment
+  instance_type     = var.ec2_instance_type
+  key_name          = var.ec2_key_name
+  root_volume_size  = var.ec2_root_volume_size
+  allowed_ssh_cidrs = var.ec2_allowed_ssh_cidrs
+  enable_elastic_ip = true
+  services          = var.services
+  auto_backup       = var.auto_backup
 }
 
-# --- EC2 ASG --------------------------------------------------------------
-
-module "ec2_asg" {
-  source = "../../../modules/aws/ec2-asg"
-
-  project_name          = var.project_name
-  environment           = local.environment
-  vpc_id                = module.networking.vpc_id
-  subnet_ids            = module.networking.public_subnet_ids
-  instance_type         = var.ec2_instance_type
-  min_size              = var.asg_min_size
-  desired_capacity      = var.asg_desired_capacity
-  max_size              = var.asg_max_size
-  root_volume_size      = var.ec2_root_volume_size
-  key_name              = var.ec2_key_name
-  allowed_ssh_cidrs     = var.ec2_allowed_ssh_cidrs
-  associate_public_ip   = true
-  alb_security_group_id = module.networking.alb_security_group_id
-  target_group_arns     = values(module.alb.target_group_arns)
-  services              = var.services
-
-  # Staging: no instance refresh needed (brief restarts OK)
-  enable_instance_refresh = false
-}
-
-# --- Monitoring (log groups only, no alarms) ------------------------------
+# --- Monitoring (log groups only — no alarms on staging) ------------------
 
 module "monitoring" {
   source = "../../../modules/aws/monitoring"
@@ -121,7 +86,7 @@ module "monitoring" {
   enable_alarms      = false
   service_names      = toset(keys(var.services))
 
-  # ALB monitoring (no alarms, but log groups for all services)
-  alb_arn_suffix            = module.alb.alb_arn_suffix
-  target_group_arn_suffixes = module.alb.target_group_arn_suffixes
+  # No ALB on staging — pass empty strings
+  alb_arn_suffix            = ""
+  target_group_arn_suffixes = {}
 }
